@@ -1,0 +1,45 @@
+{
+  "name": "react-boilerplate",
+  "version": "0.0.1",
+  "description": "My own React kit, for a quick start project",
+  "main": "index.js",
+  "scripts": {
+    "build:dev": "webpack --mode development",
+    "build:prod": "webpack --mode production",
+    "server:dev": "webpack-dev-server --mode development --hot",
+    "server:prod": "webpack-dev-server --mode production --hot"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AveDemid/react-boilerplate.git"
+  },
+  "author": "Ave Demid",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/AveDemid/react-boilerplate/issues"
+  },
+  "homepage": "https://github.com/AveDemid/react-boilerplate#readme",
+  "devDependencies": {
+    "@babel/core": "^7.4.5",
+    "@babel/polyfill": "^7.4.4",
+    "@babel/preset-env": "^7.4.5",
+    "@babel/preset-react": "^7.0.0",
+    "babel-loader": "^8.0.6",
+    "file-loader": "^4.0.0",
+    "html-webpack-plugin": "^3.2.0",
+    "prettier": "^1.18.2",
+    "webpack": "^4.35.0",
+    "webpack-cli": "^3.3.4",
+    "webpack-dev-server": "^3.7.2"
+  },
+  "dependencies": {
+    "prop-types": "^15.7.2",
+    "react": "^16.8.6",
+    "react-dom": "^16.8.6",
+    "react-router": "^5.0.1",
+    "react-router-config": "^5.0.1",
+    "react-router-dom": "^5.0.1",
+    "styled-components": "^4.3.2",
+    "styled-normalize": "^8.0.6"
+  }
+}
