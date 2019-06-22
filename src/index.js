@@ -2,7 +2,6 @@ import React from "react";
 import PropTypes from "prop-types";
 import ReactDOM from "react-dom";
 
-// Добавил combine (спасибо habrhabr)
 const combineReducers = reducersMap => {
   return (state, action) => {
     const nextState = {};
@@ -220,7 +219,10 @@ class TimerComponent extends React.Component {
   };
 
   componentDidUpdate(prevProps) {
-    if (this.props.currentInterval !== prevProps.currentInterval) {
+    if (
+      this.props.currentInterval !== prevProps.currentInterval &&
+      this.state.intervalId
+    ) {
       this.handleClearInterval();
       this.handleSetInterval();
     }
