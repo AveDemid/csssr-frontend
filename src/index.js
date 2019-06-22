@@ -2,7 +2,19 @@ import React from "react";
 import PropTypes from "prop-types";
 import ReactDOM from "react-dom";
 
-const createStore = (reducer, initialState) => {
+// Добавил combine (спасибо habrhabr)
+const combineReducers = reducersMap => {
+  return (state, action) => {
+    const nextState = {};
+    Object.entries(reducersMap).forEach(([key, reducer]) => {
+      nextState[key] = reducer(state[key], action);
+    });
+    return nextState;
+  };
+};
+
+// Default args
+const createStore = (reducer, initialState = {}) => {
   let currentState = initialState;
   const listeners = [];
 
@@ -13,6 +25,11 @@ const createStore = (reducer, initialState) => {
   };
 
   const subscribe = listener => listeners.push(listener);
+
+  // Добавил системный event, для инициализации
+  dispatch({
+    type: "__INITIAL_ACTION__"
+  });
 
   return { getState, dispatch, subscribe };
 };
@@ -29,7 +46,7 @@ const connect = (mapStateToProps, mapDispatchToProps) => Component => {
       );
     }
 
-    componentDidUpdate() {
+    componentDidMount() {
       this.context.store.subscribe(this.handleChange);
     }
 
@@ -65,7 +82,6 @@ Provider.childContextTypes = {
 
 // actions
 const CHANGE_INTERVAL = "CHANGE_INTERVAL";
-
 // action creators
 const changeInterval = value => ({
   type: CHANGE_INTERVAL,
@@ -73,44 +89,121 @@ const changeInterval = value => ({
 });
 
 // reducers
-const reducer = (state, action) => {
-  if (action.type === CHANGE_INTERVAL) {
-    return (state += action.payload);
-  } else {
-    return {};
+const currentIntervalReducer = (state = 1, action) => {
+  switch (action.type) {
+    case CHANGE_INTERVAL:
+      return (state += action.payload);
+    default:
+      return state;
   }
 };
 
-// components
+// # Ошибка: this.props.currentInterval содержит dispatch :D
+// # Решение: в connect, нарушен порядок аргументов
 
-class IntervalComponent extends React.Component {
-  render() {
-    return (
-      <div>
-        <span>
-          Интервал обновления секундомера: {this.props.currentInterval} сек.
-        </span>
-        <span>
-          <button onClick={() => this.props.changeInterval(-1)}>-</button>
-          <button onClick={() => this.props.changeInterval(1)}>+</button>
-        </span>
-      </div>
-    );
-  }
-}
+// # Ошибка: this.props.currentInterval === undefined
+// # Решение комплексное:
+//    - проверяю reducer, case default возвращает пустой объект, хотя должен возвращать state
+//    - в createStore передаю initialState и изменяем структуру стейта, выделяю отдельный ключ под значение текущего интервала
+//    - изменяю mapStateToProps так как state, имеет другую структуру
+
+// # Ошибка: при increment/decrement значния не меняются
+// # Решение комплексное:
+//    - проверяю reducer, ошибка в case (несмотря на правильно состояние slomux, не происходит обновление в компонентах)
+//    - проверяю функцию connect, использован не правильный метод жизненного цикла, не присходит подписка на стор
+
+// # Наводим порядок
+//    - данному компоненту, не нужно иметь состояния, переписываем его на stateless
+//    - избавляюсь от анонимных функций в onClick
+//    - добавляю PropTypes
+//    - значение интервала, не может быть отрицательным или 0 (event looop), по этому, добавляю disable кнопки
+
+// После данных манипуляций, IntervalComponent ведет себя предсказуемо :)
+
+const IntervalComponent = ({ changeInterval, currentInterval }) => {
+  const incrementInterval = () => changeInterval(1);
+  const decrementInterval = () => changeInterval(-1);
+
+  return (
+    <div>
+      <span>Интервал обновления секундомера: {currentInterval} сек.</span>
+      <span>
+        <button onClick={decrementInterval} disabled={currentInterval <= 1}>
+          -
+        </button>
+        <button onClick={incrementInterval}>+</button>
+      </span>
+    </div>
+  );
+};
+
+IntervalComponent.propTypes = {
+  currentInterval: PropTypes.number.isRequired,
+  changeInterval: PropTypes.func.isRequired
+};
 
 const Interval = connect(
+  state => ({
+    currentInterval: state.currentInterval
+  }),
   dispatch => ({
     changeInterval: value => dispatch(changeInterval(value))
-  }),
-  state => ({
-    currentInterval: state
   })
 )(IntervalComponent);
 
+// # Ошибка: при нажатии, на кнопки Старт и Стоп, происходит потеря значения this,
+// # Решение: - arrow function expression
+
+// # Ошибка: this.props.currentInterval === undefined
+// # Решение: изменине mapStateToProps
+
+// # Ошибка: неправильное использование setState
+// # Решение: использование prevState, для расчета следующего состояния компонента
+
+// # Ошибка: Множественные ошибки логики в запуске/остановки таймера
+// # Решение комплексное:
+//    - Вынесение логики "шага" в отдельный метод, неправлиьное использование setState для расчета нового
+//      состояния на основе текущего состояния (сет стейт, ассинхроный, необходимо использовать prevState)
+//    - Замена setTimeout на setInterval
+//    - Значение интервала передается в секундах, setInterval ожидает ms
+//    - Необходимо сохранить индентификатор таймера, для его остановки
+//    - таймер можно запустить несколько раз
+
+// # Наводим порядок
+//    - добавляю PropTypes
+
+// После данных манипуляций, IntervalComponent ведет себя предсказуемо :)
+
 class TimerComponent extends React.Component {
   state = {
-    currentTime: 0
+    currentTime: 0,
+    intervalId: null
+  };
+
+  tick = () => {
+    this.setState(prevState => ({
+      currentTime: prevState.currentTime + this.props.currentInterval
+    }));
+  };
+
+  handleStart = () => {
+    const intervalId = setInterval(
+      this.tick,
+      this.props.currentInterval * 1000
+    );
+
+    this.setState({
+      intervalId,
+      currentTime: 0
+    });
+  };
+
+  handleStop = () => {
+    clearInterval(this.state.intervalId);
+
+    this.setState({
+      intervalId: null
+    });
   };
 
   render() {
@@ -119,38 +212,37 @@ class TimerComponent extends React.Component {
         <Interval />
         <div>Секундомер: {this.state.currentTime} сек.</div>
         <div>
-          <button onClick={this.handleStart}>Старт</button>
-          <button onClick={this.handleStop}>Стоп</button>
+          <button onClick={this.handleStart} disabled={this.state.intervalId}>
+            Старт
+          </button>
+          <button onClick={this.handleStop} disabled={!this.state.intervalId}>
+            Стоп
+          </button>
         </div>
       </div>
     );
   }
-
-  handleStart() {
-    setTimeout(
-      () =>
-        this.setState({
-          currentTime: this.state.currentTime + this.props.currentInterval
-        }),
-      this.props.currentInterval
-    );
-  }
-
-  handleStop() {
-    this.setState({ currentTime: 0 });
-  }
 }
+
+TimerComponent.propTypes = {
+  currentInterval: PropTypes.number.isRequired
+};
 
 const Timer = connect(
   state => ({
-    currentInterval: state
+    currentInterval: state.currentInterval
   }),
   () => {}
 )(TimerComponent);
 
-// init
+const rootReducer = combineReducers({
+  currentInterval: currentIntervalReducer
+});
+
+const store = createStore(rootReducer);
+
 ReactDOM.render(
-  <Provider store={createStore(reducer)}>
+  <Provider store={store}>
     <Timer />
   </Provider>,
   document.getElementById("app")
