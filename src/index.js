@@ -167,7 +167,8 @@ const Interval = connect(
 //    - Замена setTimeout на setInterval
 //    - Значение интервала передается в секундах, setInterval ожидает ms
 //    - Необходимо сохранить индентификатор таймера, для его остановки
-//    - таймер можно запустить несколько раз
+//      таймер можно запустить несколько раз,
+//    - Обновление таймера, при изменениии currentInterval "на лету"
 
 // # Наводим порядок
 //    - добавляю PropTypes
@@ -186,25 +187,44 @@ class TimerComponent extends React.Component {
     }));
   };
 
-  handleStart = () => {
+  handleSetInterval = () => {
     const intervalId = setInterval(
       this.tick,
       this.props.currentInterval * 1000
     );
 
     this.setState({
-      intervalId,
-      currentTime: 0
+      intervalId
     });
   };
 
-  handleStop = () => {
+  handleClearInterval = () => {
     clearInterval(this.state.intervalId);
+  };
+
+  handleStart = () => {
+    this.setState(
+      {
+        currentTime: 0
+      },
+      () => this.handleSetInterval()
+    );
+  };
+
+  handleStop = () => {
+    this.handleClearInterval();
 
     this.setState({
       intervalId: null
     });
   };
+
+  componentDidUpdate(prevProps) {
+    if (this.props.currentInterval !== prevProps.currentInterval) {
+      this.handleClearInterval();
+      this.handleSetInterval();
+    }
+  }
 
   render() {
     return (
